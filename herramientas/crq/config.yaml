@@ -1,0 +1,157 @@
+# Configuración para la base de datos (usuarios pSeries)
+resi:
+  use_django_api: true
+  django_api_url: 'https://10.8.150.90/'
+  use_django_db: false
+  db:
+    engine: 'mysql'
+    host: '10.8.150.90'
+    port: 3306
+    name: 'reporte_de_consumos'
+    user: 'self_services_db'
+    password: 'UEZyHanKFYTchokMatZRSzaSWrtFqn.'
+    query: "SELECT username FROM users_user WHERE torre = 'Pseries'"
+helix:
+  base_url: 'https://bancolombia-restapi.onbmc.com'
+  timeout: 30
+  retries: 3
+  auth:
+    endpoint: '/api/jwt/login'
+    username: 'cnxuignu'
+    password: 'Ff6/p6fUcnyYOMyZf'
+    username_field: 'username'
+    password_field: 'password'
+    send_as: 'form'
+    token_path: 'token'
+    token_prefix: 'AR-JWT'
+    basic_auth: false
+  crq:
+    endpoint: '/api/arsys/v1/entry/CHG:Infrastructure Change'
+    page_size: 1000
+    max_pages: 500
+    max_records: 500000
+    results_path: 'entries'
+    crq_date_field: 'Actual End Date'
+    fields: 'values(Infrastructure Change ID,z1D_Template_Name,Change Request Status,Status Reason,Submit Date,Actual End Date,Scheduled Start Date,Scheduled End Date,Company3)'
+    params: {}
+  tasks:
+    endpoint: '/api/arsys/v1/entry/TMS:Task'
+    page_size: 1000
+    max_pages: 500
+    max_records: 500000
+    results_path: 'entries'
+    fields: 'values(RootRequestID,Task ID,TaskName,Summary,Assignee,Assignee Group,Status,StatusReasonSelection,Actual Start Date,Actual End Date,Scheduled Start Date,Scheduled End Date,Activate Time,End Time,Last Modified By)'
+    task_date_field: 'End Time'
+  people:
+    endpoint: '/api/arsys/v1/entry/CTM:People'
+    page_size: 500
+    max_pages: 200
+    max_records: 100000
+    results_path: 'entries'
+    fields: 'values(Full Name,Remedy Login ID)'
+    params: {} # Opcional: q: "'Groups' = \"Grupo pSeries TCS\""
+
+# Rango de fechas para filtrar TMS:Task (campo End Time)
+date_range:
+  date_from: '2026-04-01'
+  date_to: '2026-04-15'
+
+columns:
+  crq_id: 'Infrastructure Change ID'
+  task_crq_id: 'RootRequestID'
+  categoria: 'z1D_Template_Name'
+  tarea: 'TaskName'
+  motivo_estado: 'StatusReasonSelection'
+  asignado: 'Assignee'
+  filial: 'filial_crq'
+  estado: 'estado_crq'
+  razon_estado_crq: 'Status Reason'
+  user_login: 'Remedy Login ID'
+  user_fullname: 'Full Name'
+  riesgo: null # Extraido del nombre de la plantilla z1D_Template_Name
+
+business:
+  # Categorías exactas (se comparan normalizando tildes y mayúsculas)
+  # tipoDeCambio=Aprovisionamiento
+  category_aprovisionamiento:
+    - 'Cambio en Produccion.Manual.Estandar.Aprovisionamiento_pSeries.Riesgo =1'
+  # tipoDeCambio=Consejo
+  category_consejo:
+    - 'Cambio en Produccion.Manual.Programado.General.Riesgo >=3'
+  # Tareas permitidas (whitelist exacta)
+  allowed_tasks:
+    - 'Ejecutar Cambio pSeries'
+    - 'Ejecutar Cambio'
+    - 'Ejecutar Cambio TI'
+    - 'Implementación Cambio'
+    - 'Ejecutar cambio en produccion'
+  # Filial requerida
+  filial_requerida: 'BANCOLOMBIA S.A.'
+  # Traducciones estado tarea (StatusReasonSelection)
+  status_translations:
+    Success: 'Satisfactorio'
+    Cancelled: 'Cancelado'
+    Assignment: 'Encargado'
+    Failed: 'Fallido'
+  success_reasons:
+    - 'Satisfactorio'
+  # Traducciones estado CRQ (Change Request Status)
+  crq_status_translations:
+    Closed: 'Cerrado'
+    Cancelled: 'Cancelado'
+    Scheduled: 'Planificado'
+    Rejected: 'Rechazado'
+    Completed: 'Completado'
+    Draft: 'Borrador'
+    Implementation In Progress: 'En implementacion'
+
+output:
+  file_prefix: 'CRQ_Report'
+  # Columnas amarillas del Excel de referencia → excluir (nombres API, antes del renombre)
+  exclude_columns:
+    - 'Status' # estadoTarea - amarillo
+    - 'Actual Start Date' # horaInicioTarea - amarillo
+    - 'Actual End Date' # horaFinTarea (tarea) - amarillo; la de CHG se renombra antes del join
+    - 'Scheduled Start Date' # horaInicioProgramadaTarea (tarea) - amarillo; la de CHG se renombra antes
+    - 'Scheduled End Date' # horaFinProgramadaTarea (tarea) - amarillo; la de CHG se renombra antes
+    - 'Status Reason' # razonDeEstado (CHG) - amarillo
+    - 'Full Name' # fullName - amarillo
+    - 'Last Modified By' # interno
+    - 'Infrastructure Change ID' # redundante con codigoOrden (RootRequestID)
+  # Renombrar columnas API → nombres negocio (igual al Excel de referencia)
+  rename_columns:
+    RootRequestID: 'codigoOrden'
+    z1D_Template_Name: 'categoria'
+    estado_crq: 'estado'
+    fechaCreacionCrq_crq: 'fechaCreacionCrq'
+    fechaCierreCrq_crq: 'fechaCierreCrq'
+    fechaInicioProgramada_crq: 'fechaInicioProgramada'
+    fechaFinProgramada_crq: 'fechaFinProgramada'
+    filial_crq: 'filial'
+    Task ID: 'codigoTarea'
+    TaskName: 'tarea'
+    Summary: 'resumenTarea'
+    Assignee: 'asignado'
+    Assignee Group: 'grupoAsignado'
+    StatusReasonSelection: 'motivoDelEstado'
+    Activate Time: 'inicioTareaSistema'
+    End Time: 'cerroTareaSistema'
+  # Orden final de columnas en el Excel (las que no estén aquí van al final)
+  column_order:
+    - 'codigoOrden'
+    - 'categoria'
+    - 'estado'
+    - 'fechaCreacionCrq'
+    - 'fechaCierreCrq'
+    - 'fechaInicioProgramada'
+    - 'fechaFinProgramada'
+    - 'filial'
+    - 'codigoTarea'
+    - 'tarea'
+    - 'resumenTarea'
+    - 'asignado'
+    - 'grupoAsignado'
+    - 'motivoDelEstado'
+    - 'inicioTareaSistema'
+    - 'cerroTareaSistema'
+    - 'tipoDeCambio'

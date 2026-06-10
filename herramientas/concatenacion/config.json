@@ -1,0 +1,17 @@
+{
+  "api_url": "https://bancolombia-restapi.onbmc.com",
+  "helix_user": "cnxuignu",
+  "helix_password": "Ff6/p6fUcnyYOMyZf",
+  "torre": "Base de datos",
+  "use_django_api": true,
+  "django_api_url": "https://10.8.150.90/",
+  "use_django_db": false,
+  "db": {
+    "engine": "mysql",
+    "name": "reporte_de_consumos",
+    "host": "10.8.150.90",
+    "port": 3306,
+    "user": "self_services_db",
+    "password": "UEZyHanKFYTchokMatZRSzaSWrtFqn."
+  }
+}
