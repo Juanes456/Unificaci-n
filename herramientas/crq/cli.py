@@ -216,6 +216,14 @@ def run_crq(
                 }
             )
 
+        # Ordenar cronológicamente por la fecha de cierre de la tarea (cerroTareaSistema)
+        if "cerroTareaSistema" in df_filtered.columns:
+            try:
+                temp_dates = pd.to_datetime(df_filtered["cerroTareaSistema"], errors="coerce")
+                df_filtered = df_filtered.iloc[temp_dates.argsort()].copy()
+            except Exception as e:
+                logger.warning("No se pudo ordenar cronológicamente por cerroTareaSistema: %s", e)
+
         # Formatear columnas de fecha a formato humano (DD/MM/YYYY HH:MM:SS)
         date_columns = [
             "fechaCreacionCrq",
@@ -256,21 +264,11 @@ def run_crq(
 
         logger.info("Reporte generado: %s", output_path)
 
-        # Abrir Explorador de Windows en la carpeta donde se guardó el Excel
-        try:
-            import os
-
-            out_dir = output_path.parent
-            # startfile abre el path en el explorador
-            os.startfile(str(out_dir))
-        except Exception as exc:
-            logger.warning("No se pudo abrir el explorador de salida: %s", exc)
-
-        return 0
+        return 0, str(output_path)
 
     except (ConfigError, AuthenticationError, ApiError, DataValidationError) as exc:
         logger.error("[ERROR] %s", exc)
-        return 2
+        return 2, str(exc)
     except Exception as exc:
         logger.exception("[ERROR INESPERADO] %s", exc)
-        return 3
+        return 3, str(exc)

@@ -41,8 +41,8 @@ def queryData(url, showPag = True):
                 pageURL = f'{url}&limit={limit}&offset={offset}'
             else:
                 pageURL = f'{endpoint}{url}&limit={limit}&offset={offset}'
-            #Consulta GET
-            response = requests.get(pageURL, headers=headers, data=payload, verify= True)
+            #Consulta GET, desactivando la verificación SSL (verify=False) para el entorno corporativo/VPN
+            response = requests.get(pageURL, headers=headers, data=payload, verify=False)
             if response.status_code != 200:
                 raise ValueError(f"Error al consultar la API: {response.status_code} - {response.text}")
             

@@ -5,20 +5,25 @@ from openpyxl.utils import get_column_letter as getColLetter
 from openpyxl.cell.cell import MergedCell
 
 def applyStyleExcel(pathFile):
-    '''
-        Esta función aplica estilos al archivo excel que previamente se ha guardado con la aplicacion
-        parameters:
-            pathFile (str): ruta del archivo excel al que se le aplicaran los estilos
-            typeReport (str): tipo de reporte que se esta generando, para aplicar estilos especificos
-            
-    '''
+    """
+    Aplica estilos visuales (colores de cabecera, bordes, fuentes, auto-filtros y anchos) a un Excel.
+    
+    Aplica formateo diferenciado según el nombre de la pestaña (ej. 'Reporte', 'Reporte SLA', 'Eventos', etc.).
+    Ajusta el ancho de las columnas y asigna colores semánticos (verde para a tiempo, rojo para vencido).
+    
+    Args:
+        pathFile (str): Ruta al archivo Excel en el disco que se va a formatear.
+        
+    Raises:
+        ValueError: Si el archivo Excel está vacío o ocurre un error durante el procesamiento de los estilos.
+    """
     
     try:
         wb = openpyxl.load_workbook(pathFile)
         if not wb.sheetnames:
             raise ValueError("El archivo Excel esta vacio, no se aplican estilos.")
         
-        # Personalizando las cabeceras, el tipo de letra y la alineación
+        # Paleta de colores y estilos de fuente corporativos
         blueFill = PatternFill(start_color="1B7EF7", fill_type="solid")
         orangeFill = PatternFill(start_color="FAAA15", fill_type="solid")
         redFill = PatternFill(start_color="FF0000", fill_type="solid")
@@ -36,10 +41,11 @@ def applyStyleExcel(pathFile):
             bottom=Side(style='thin', color='000000')
         )
         
+        # Iterar por cada pestaña del libro
         for sheet in wb.sheetnames:
             ws = wb[sheet]
             
-            #Aplicamos formato y filtros a las cabeceras
+            # Aplicar estilos a las cabeceras y auto-filtros en hojas de datos planos
             if sheet in ['Reporte', 'Datos', 'insumoCMDB', 'Datos CRQ', 'Datos WO']:
                 ws.auto_filter.ref = f'A1:{getColLetter(ws.max_column)}1'
                 for cell in ws[1]:
@@ -49,6 +55,7 @@ def applyStyleExcel(pathFile):
                     cell.alignment = centerAlignment
                     ws.column_dimensions[cell.column_letter].width = 35
             
+            # Aplicar colores semánticos a las celdas del reporte SLA
             elif sheet == 'Reporte SLA':
                 ws.auto_filter.ref = f'A1:{getColLetter(ws.max_column)}1'
                 colCumplimiento = []
@@ -61,6 +68,7 @@ def applyStyleExcel(pathFile):
                         colCumplimiento.append(cell.column_letter)
                     ws.column_dimensions[cell.column_letter].width = 25
                 
+                # Resaltar en verde las celdas "A Tiempo", en rojo las "Vencido" y en amarillo los registros "Por validar"
                 for row in ws.iter_rows(min_row=1, max_row=ws.max_row):
                     for col in colCumplimiento:
                         cell = ws[f'{col}{row[0].row}']
@@ -74,6 +82,7 @@ def applyStyleExcel(pathFile):
                             for column in range(1, ws.max_column + 1):
                                 ws.cell(row=cell.row, column=column).fill = yellowFill
 
+            # Formatear pestañas complejas con tablas de resumen y celdas combinadas
             elif sheet in ['Eventos', 'Incidentes']:
                 for row in ws.iter_rows(min_row=1, max_row=ws.max_row):
                     for cell in row:
@@ -82,6 +91,7 @@ def applyStyleExcel(pathFile):
                         if not isinstance(cell, MergedCell):
                             if not (cell.value is None):
                                 cell.border= borderStyle
+                                # Detectar títulos de resumen y colorear filas totales
                                 if cell.value == 'Resumen SLA por Torre':
                                     cell.fill = blackFill
                                     cell.font = whiteFont

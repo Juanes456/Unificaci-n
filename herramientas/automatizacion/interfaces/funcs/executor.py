@@ -15,18 +15,27 @@ from reports.validateSLA import validateSLA
 locale.setlocale(locale.LC_TIME, 'es_Es.UFT-8')
 
 def runProcess(initialDate, endDate, parameters, typeReport, getSLA=True, wo1=None, wo2=None):
-    '''
-        Esta función ejecuta el proceso de generación de reportes, dependiendo del tipo de reporte solicitado.
-        parameters:
-            initialDate (datetime): Fecha inicial del reporte
-            endDate (datetime): Fecha final del reporte
-            parameters (str): ruta donde se encuentra el archivo de parametros
-            typeReport (str): Tipo de reporte que se desea generar (e.g., "Incidentes abiertos", "CRQs", etc.)
-            getSLA (bool): Indica si se desea calcular el SLA, por defecto es True
-            wo1 (str): Ruta del archivo de WOs del 1 al 15 del mes, por defecto es None
-            wo2 (str): Ruta del archivo de WOs del 16 al 30 del mes, por defecto es None
-    '''
+    """
+    Orquesta y ejecuta la generación de reportes dependiendo del tipo solicitado.
+    
+    Flujo:
+    1. Valida que se hayan ingresado todos los parámetros obligatorios según el tipo de reporte.
+    2. Utiliza un bloque match-case para delegar al generador de reporte correspondiente.
+    3. Pregunta al usuario interactivamente dónde guardar el archivo Excel final mediante `fd.asksaveasfilename`.
+    4. Escribe el archivo Excel, le aplica estilos visuales premium mediante `stEx.applyStyleExcel` y muestra una alerta de éxito.
+    5. Si el usuario cancela la selección de ruta, el proceso aborta limpiamente sin errores.
+    
+    Args:
+        initialDate (datetime): Fecha de inicio para el filtrado del reporte.
+        endDate (datetime): Fecha final para el filtrado del reporte.
+        parameters (str): Ruta al archivo de parámetros (Helix login, etc.).
+        typeReport (str): El nombre del reporte (ej. 'Informe SLA', 'Informe WO', 'Informe CRQ', etc.).
+        getSLA (bool): Flag opcional indicando si se calcula el SLA. Por defecto es True.
+        wo1 (str): Ruta opcional del primer archivo de WO (días 1 al 15 del mes).
+        wo2 (str): Ruta opcional del segundo archivo de WO (días 16 al 30 del mes).
+    """
     try:
+        # Validación inicial de parámetros
         is_incident_report = typeReport in ['Incidentes abiertos', 'Incidentes cerrados']
         if typeReport == "Informe WO" and (not wo1 or not wo2) or (not parameters and not is_incident_report):
             raise ValueError("No se ingresaron todos los parametros solicitados")
@@ -35,9 +44,19 @@ def runProcess(initialDate, endDate, parameters, typeReport, getSLA=True, wo1=No
         
         match typeReport:
             case 'Informe SLA':
+                # Obtener mes en español para el nombre sugerido del archivo
                 mes = initialDate.strftime("%B").capitalize()
-                desktop = os.path.join(os.path.expanduser('~'), 'Desktop')
-                pathSave = os.path.join(desktop,f'Informe_SLA - {mes}.xlsx')
+                initial_file = f'Informe_SLA - {mes}.xlsx'
+                # Solicitar ruta interactiva al usuario
+                pathSave = fd.asksaveasfilename(
+                    initialfile=initial_file,
+                    defaultextension=".xlsx",
+                    filetypes=[("Excel files", "*.xlsx")]
+                )
+                if not pathSave:
+                    return # Cancelado por el usuario
+                
+                # Ejecutar consulta y lógica del reporte SLA
                 datos = getReportSLA(initialDate, endDate, parameters, wo1, wo2)
                 svEx.saveExcelFile(datos, pathSave)
                 print('Archivo excel guardado exitosamente, ahora se aplican estilos')
@@ -45,30 +64,40 @@ def runProcess(initialDate, endDate, parameters, typeReport, getSLA=True, wo1=No
                 mb.showinfo(title="Estilos aplicados", message=f"Se ha generado el archivo correctamente en: {pathSave}")
 
             case 'Informe WO':
+                # Ejecutar reporte de Órdenes de Trabajo (WO)
                 datos = getReportWO(wo1, wo2, parameters, getSLA)
                 filePath = fd.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")])
+                if not filePath:
+                    return # Cancelado por el usuario
                 svEx.saveExcelFile(datos, filePath)
                 print('Archivo excel guardado exitosamente, ahora se aplican estilos')
                 stEx.applyStyleExcel(filePath)
                 mb.showinfo(title="Estilos aplicados", message=f"Se ha generado el archivo correctamente en: {filePath}")
                 
             case 'Informe CRQ':
+                # Ejecutar reporte de Cambios (CRQ)
                 datos = getReportCRQ(initialDate, endDate, parameters, getSLA)
                 filePath = fd.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")])
+                if not filePath:
+                    return # Cancelado por el usuario
                 svEx.saveExcelFile(datos, filePath)
                 print('Archivo excel guardado exitosamente, ahora se aplican estilos')
                 stEx.applyStyleExcel(filePath)
                 mb.showinfo(title="Estilos aplicados", message=f"Se ha generado el archivo correctamente en: {filePath}")
                 
             case 'Insumo CMDB':
+                # Generar reporte de insumo CMDB
                 datos = getInsumoCMDB(initialDate, endDate, wo1, wo2, parameters)
                 filePath = fd.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")])
+                if not filePath:
+                    return # Cancelado por el usuario
                 svEx.saveExcelFile(datos, filePath)
                 print('Archivo excel guardado exitosamente, ahora se aplican estilos')
                 stEx.applyStyleExcel(filePath)
                 mb.showinfo(title="Estilos aplicados", message=f"Se ha generado el archivo correctamente en: {filePath}")
                 
             case 'Incidentes cerrados':
+                # Generar reporte de incidentes cerrados (usa plantilla con ListObjects)
                 datos = getReportFinishInc(initialDate, endDate, parameters)
                 if not datos or datos.get("Data") is None or datos["Data"].empty:
                     raise ValueError('No hay datos para analizar (VPN inactiva o sin registros)')
@@ -80,7 +109,7 @@ def runProcess(initialDate, endDate, parameters, typeReport, getSLA=True, wo1=No
                     filetypes=[("Excel files", "*.xlsx")]
                 )
                 if not pathSave:
-                    return
+                    return # Cancelado por el usuario
                 diaInicial = initialDate.day
                 diafinal = endDate.day
                 mesFinal = endDate.strftime('%b')
@@ -89,6 +118,7 @@ def runProcess(initialDate, endDate, parameters, typeReport, getSLA=True, wo1=No
                 mb.showinfo(title='Exito', message=f'El archivo se ha guardado correctamente en: {pathSave}')
                 
             case 'Incidentes abiertos':
+                # Generar reporte de incidentes abiertos
                 datos = getReportOpenInc(initialDate, endDate, parameters)
                 if not datos:
                     raise ValueError('No hay datos para analizar (VPN inactiva o sin registros)')
@@ -100,7 +130,7 @@ def runProcess(initialDate, endDate, parameters, typeReport, getSLA=True, wo1=No
                     filetypes=[("Excel files", "*.xlsx")]
                 )
                 if not pathSave:
-                    return
+                    return # Cancelado por el usuario
                 svEx.saveExcelFile(datos, pathSave)
                 print('Archivo excel guardado exitosamente, ahora se aplican estilos')
                 stEx.applyStyleExcel(pathSave)
@@ -113,11 +143,15 @@ def runProcess(initialDate, endDate, parameters, typeReport, getSLA=True, wo1=No
         mb.showerror(title="Error", message=ve)
 
 def runValidateSLA(path):
-    '''
-        Esta función ejecuta el proceso de validación de SLA para los reportes de CRQ y WO.
-        Parameters:
-            path (str): Ruta del archivo de reporte a validar
-    '''
+    """
+    Ejecuta el algoritmo de validación de SLAs sobre un archivo Excel de reportes generado previamente.
+    
+    Muestra la ruta resultante en un cuadro de diálogo para que el usuario elija exactamente
+    dónde y bajo qué nombre desea almacenar los resultados validados.
+    
+    Args:
+        path (str): Ruta completa al archivo Excel de origen (WO o CRQ) que se validará.
+    """
     if not path:
         mb.showerror(title="Error", message="No se ha seleccionado un archivo para validar")
         
@@ -127,8 +161,16 @@ def runValidateSLA(path):
             mb.showerror(title="Error", message="No se encontraron registros para validar")
             raise ValueError("No se encontraron registros para validar")
         
+        # Sugerir un nombre de archivo por defecto agregando el sufijo "_Validado"
         base, ext = os.path.splitext(path)
-        filePath = f'{base}_Validado{ext}'
+        initial_file = f'{os.path.basename(base)}_Validado{ext}'
+        filePath = fd.asksaveasfilename(
+            initialfile=initial_file,
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx")]
+        )
+        if not filePath:
+            return # Cancelado por el usuario
         svEx.saveExcelFile(datos, filePath)
         print('Archivo excel guardado exitosamente, ahora se aplican estilos')
         stEx.applyStyleExcel(filePath)

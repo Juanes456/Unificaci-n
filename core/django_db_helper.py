@@ -15,7 +15,21 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logger = logging.getLogger(__name__)
 
 def _normalizar(valor: str) -> str:
-    """Minúsculas, sin tildes/diacríticos y sin espacios extra."""
+    """
+    Normaliza una cadena de texto para facilitar comparaciones consistentes.
+    
+    Proceso:
+    1. Convierte el texto a minúsculas y elimina espacios en blanco al inicio y al final.
+    2. Aplica normalización Unicode NFD para separar los caracteres base de sus diacríticos.
+    3. Remueve tildes, diéresis y otros caracteres de la categoría 'Mn' (Nonspacing Mark).
+    4. Usa expresiones regulares para sustituir múltiples espacios en blanco consecutivos por uno solo.
+    
+    Args:
+        valor (str): Cadena de texto a normalizar.
+        
+    Returns:
+        str: Cadena de texto normalizada limpia.
+    """
     s = str(valor).strip().lower()
     s = unicodedata.normalize("NFD", s)
     s = "".join(c for c in s if unicodedata.category(c) != "Mn")
@@ -23,7 +37,24 @@ def _normalizar(valor: str) -> str:
     return s
 
 def _process_api_users_list(users_list: list, torre: str, source_name: str = "la API de Django") -> set[str]:
-    """Filtra y normaliza los usuarios obtenidos de formato de API/JSON."""
+    """
+    Filtra y normaliza la lista de usuarios obtenida en formato JSON/diccionario.
+    
+    Valida el estado activo de cada usuario, verifica si pertenece a la torre objetivo
+    (o a cualquiera de la lista de torres válidas si la torre objetivo es 'todos')
+    y agrega tanto el nombre completo normalizado como el usuario normalizado al conjunto.
+    
+    Args:
+        users_list (list): Lista de diccionarios de usuario retornados por el backend.
+        torre (str): Torre objetivo a filtrar (ej. 'Base de datos', 'pSeries', 'todos').
+        source_name (str): Nombre descriptivo de la fuente para logs o errores.
+        
+    Returns:
+        set[str]: Conjunto de nombres y usuarios normalizados.
+        
+    Raises:
+        ValueError: Si no se encuentran usuarios activos coincidentes.
+    """
     users = set()
     torres_list = ["base de datos", "pseries", "malla de operaciones", "wintel", "storage"]
     is_multi_torre = not torre or torre.strip().lower() == "todos"
@@ -64,8 +95,24 @@ def _process_api_users_list(users_list: list, torre: str, source_name: str = "la
 
 def get_users_from_api(api_url: str, torre: str, timeout: int = 30) -> set[str]:
     """
-    Realiza una petición GET al endpoint usuarios-tcs de Django para obtener 
-    los usuarios y filtrar por la torre correspondiente.
+    Realiza una petición GET al endpoint HTTP de Django para obtener la lista de usuarios TCS.
+    
+    Implementa un mecanismo de tolerancia a fallos (fallback):
+    1. Si la llamada HTTP tiene éxito, actualiza un archivo de caché local (usuarios_tcs_cache.json).
+    2. Si la llamada falla (por timeout o caída del servidor), intenta cargar desde la caché local.
+    3. Si la caché local no existe o está corrupta, intenta realizar consultas directas a la base de datos
+       SQLite de desarrollo local en las rutas habituales.
+       
+    Args:
+        api_url (str): Dirección base del backend Django.
+        torre (str): Torre por la cual filtrar los analistas.
+        timeout (int): Límite de espera de la petición HTTP en segundos.
+        
+    Returns:
+        set[str]: Conjunto de nombres de usuario y usuarios normalizados.
+        
+    Raises:
+        ValueError: Si la API y todos los mecanismos de fallback fallan.
     """
     if not api_url:
         api_url = "http://127.0.0.1:8000/"
@@ -156,8 +203,20 @@ def get_users_from_api(api_url: str, torre: str, timeout: int = 30) -> set[str]:
 
 def get_users_from_db(db_config: dict, torre: str) -> set[str]:
     """
-    Se conecta a la base de datos de Django (SQLite o MySQL) y obtiene la lista de 
-    usuarios desde la tabla UsuariosTCS.
+    Se conecta directamente a la base de datos relacional de Django (SQLite o MySQL) y obtiene analistas TCS.
+    
+    Ejecuta consultas SQL sobre la tabla `UsuariosTCS` filtrando analistas de la torre asignada
+    que estén marcados como activos (activo = 1).
+    
+    Args:
+        db_config (dict): Parámetros de conexión a la base de datos (engine, host, port, user, password, name).
+        torre (str): Nombre de la torre de analistas (ej: 'Base de datos', 'Wintel').
+        
+    Returns:
+        set[str]: Conjunto de nombres de analistas y usuarios normalizados.
+        
+    Raises:
+        ValueError: Si la conexión o consulta fallan y no es posible recuperar analistas.
     """
     if not db_config:
         raise ValueError("La configuración de base de datos 'db' está vacía o es inválida.")

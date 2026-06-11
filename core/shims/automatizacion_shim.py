@@ -51,6 +51,12 @@ _loading_thread = None
 
 
 def start_async_import():
+    """
+    Inicia la importación asíncrona en un hilo separado de las interfaces lentas.
+    
+    Evita la congelación o bloqueo de la UI en el arranque de la aplicación principal
+    por la importación pesada de módulos y librerías externas (como spaCy).
+    """
     global _loading_thread
     with _import_lock:
         if _loading_thread is not None or _modules_loaded:
@@ -76,7 +82,16 @@ start_async_import()
 
 
 def build_automatizacion_page(container):
-    """Página de automatización con diseño premium consistente."""
+    """
+    Construye la página principal de Automatización de Informes en CustomTkinter.
+    
+    Dibuja los paneles de selección y crea un bucle de espera dinámico
+    para habilitar los controles solo una vez que las importaciones asíncronas
+    se hayan completado correctamente de fondo.
+    
+    Args:
+        container (ctk.CTkFrame): Frame contenedor donde se renderizará el módulo.
+    """
 
     for w in container.winfo_children():
         w.destroy()
@@ -176,6 +191,10 @@ def build_automatizacion_page(container):
     run_token = {"id": 0}
 
     def _render(*_):
+        """
+        Limpia el contenedor secundario y carga dinámicamente la clase de interfaz
+        del módulo de automatización que corresponda a la selección del OptionMenu.
+        """
         for w in render_area.winfo_children():
             w.destroy()
 
@@ -212,6 +231,13 @@ def build_automatizacion_page(container):
             print("[unificada] interfaceSelect error:", repr(e))
 
     def check_loading_status():
+        """
+        Controla el bucle de espera en la interfaz gráfica.
+        
+        Muestra una barra de progreso de carga y actualiza dots animados.
+        Una vez completada la importación, remueve la pantalla de carga e inicializa
+        la vista llamando a `_render()`.
+        """
         for w in render_area.winfo_children():
             w.destroy()
 
@@ -228,11 +254,11 @@ def build_automatizacion_page(container):
                 text_color=ERROR, justify="left", wraplength=680,
             ).pack(padx=20, pady=20, anchor="nw")
         else:
-            # ── Loading animation ──
+            # ── Pantalla de Carga ──
             loading_frame = ctk.CTkFrame(render_area, fg_color="transparent")
             loading_frame.pack(expand=True, fill="both", padx=20, pady=20)
 
-            # Indeterminate progress bar
+            # Barra de progreso indeterminada de CustomTkinter
             pbar = ctk.CTkProgressBar(
                 loading_frame, fg_color=BORDER_SUBTLE,
                 progress_color=ACCENT_INDIGO,
@@ -257,7 +283,7 @@ def build_automatizacion_page(container):
                 text_color=TEXT_MUTED,
             ).pack(pady=2)
 
-            # Animated dots
+            # Efecto animado de puntos suspensivos en el texto de carga
             dots = ["", ".", "..", "..."]
 
             def update_dots(idx=0):
@@ -274,6 +300,7 @@ def build_automatizacion_page(container):
 
             update_dots()
 
+            # Monitoreo continuo mediante after() hasta que la carga termine
             def poll():
                 if _modules_loaded:
                     try:

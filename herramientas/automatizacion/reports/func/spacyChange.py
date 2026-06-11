@@ -3,8 +3,18 @@ import numpy as np
 import spacy
 import re
 
-#Se carga el mondelo en español de spacy
-nlp = spacy.load('es_core_news_lg')
+_nlp = None
+
+def get_nlp():
+    """
+    Obtiene la instancia única del modelo de lenguaje de spaCy de manera perezosa (lazy loading).
+    Carga el modelo 'es_core_news_lg' excluyendo los componentes 'parser' y 'ner' para
+    hacer la carga mucho más rápida y eficiente en memoria, sin alterar los vectores de palabras.
+    """
+    global _nlp
+    if _nlp is None:
+        _nlp = spacy.load('es_core_news_lg', exclude=["parser", "ner"])
+    return _nlp
 
 #Se crea una funcion para normalizar texto, pero vamos a conservar tildes
 def normalizeText(text):
@@ -34,8 +44,8 @@ def hybridSemanticSim(text1, text2):
     }
     
     #Normalizamos los textos ingresados y genereamos los token de cada texto
-    text1_nlp = nlp(normalizeText(text1))
-    text2_nlp = nlp(normalizeText(text2))
+    text1_nlp = get_nlp()(normalizeText(text1))
+    text2_nlp = get_nlp()(normalizeText(text2))
     
     #Determinamos la magnitud por spacy tradiccional validando que se tengan valores por token
     simSCy = 0
@@ -135,8 +145,8 @@ def verbSim(text1, text2):
     max_sim = 0.0
     for verbo1 in verbos1:
         for verbo2 in verbos2:
-            doc_v1 = nlp(verbo1)
-            doc_v2 = nlp(verbo2)
+            doc_v1 = get_nlp()(verbo1)
+            doc_v2 = get_nlp()(verbo2)
             if doc_v1.has_vector and doc_v2.has_vector:
                 sim = doc_v1.similarity(doc_v2)
                 max_sim = max(max_sim, sim)
@@ -184,8 +194,8 @@ def lemmaSimWO(text1, text2):
         return:
             value (float): valor de similitud por lemas
     '''
-    text1 = nlp(normalizeText(text1))
-    text2 = nlp(normalizeText(text2))
+    text1 = get_nlp()(normalizeText(text1))
+    text2 = get_nlp()(normalizeText(text2))
     #Separamos los textos por lemas
     lemas1 = {token.lemma_ for token in text1 if not token.is_stop and not token.is_punct and token.is_alpha}
     lemas2 = {token.lemma_ for token in text2 if not token.is_stop and not token.is_punct and token.is_alpha}

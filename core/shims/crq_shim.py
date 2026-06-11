@@ -20,17 +20,32 @@ from design_tokens import *
 
 
 class MultiSelectModal(ctk.CTkToplevel):
+    """
+    Ventana emergente modal que permite la selección múltiple de categorías.
+    
+    Proporciona checkboxes interactivos y botones de selección rápida (todos/ninguno).
+    """
     def __init__(self, parent, title, options, current_selection, callback):
+        """
+        Inicializa la ventana modal y centra su posición relativa a la ventana padre.
+        
+        Args:
+            parent (Tk/CTk): Ventana principal propietaria de la modal.
+            title (str): Título a mostrar en la barra de la ventana.
+            options (list[str]): Opciones disponibles a listar con checkboxes.
+            current_selection (list[str]): Categorías seleccionadas previamente para marcarlas por defecto.
+            callback (callable): Función a la que se envían las opciones seleccionadas al pulsar Aceptar.
+        """
         super().__init__(parent)
         self.title(title)
         self.geometry("580x480")
         self.configure(fg_color=BG_DEEPEST)
         
-        # Make modal
+        # Bloquear interacciones con la ventana padre mientras esta esté abierta
         self.transient(parent)
         self.grab_set()
         
-        # Center window relative to parent
+        # Centrar la modal en la pantalla relativo al padre
         self.update_idletasks()
         try:
             px = parent.winfo_x()
@@ -47,11 +62,11 @@ class MultiSelectModal(ctk.CTkToplevel):
         self.options = options
         self.vars = {}
 
-        # Content Frame
+        # Contenedor de contenido
         content = ctk.CTkFrame(self, fg_color="transparent")
         content.pack(fill="both", expand=True, padx=24, pady=24)
 
-        # Title/Header
+        # Encabezado
         ctk.CTkLabel(
             content, text="Selección de Categorías",
             font=ctk.CTkFont(family=FONT_FAMILY, size=16, weight="bold"),
@@ -66,14 +81,14 @@ class MultiSelectModal(ctk.CTkToplevel):
             anchor="w"
         ).pack(fill="x", pady=(0, 16))
 
-        # Scrollable Frame for Options
+        # Panel desplazable para enlistar las categorías
         scroll = ctk.CTkScrollableFrame(
             content, fg_color=BG_CARD, border_color=BORDER_SUBTLE, border_width=1,
             corner_radius=CARD_RADIUS
         )
         scroll.pack(fill="both", expand=True, pady=(0, 16))
 
-        # Determine if "Todos" (all options are selected)
+        # Determinar si marcar "Todos"
         is_all_selected = len(current_selection) == 0 or "Todos" in current_selection or set(current_selection) == set(options)
 
         for opt in options:
@@ -93,11 +108,11 @@ class MultiSelectModal(ctk.CTkToplevel):
             )
             cb.pack(fill="x", anchor="w")
 
-        # Actions Footer Frame
+        # Botones de pie de página
         footer = ctk.CTkFrame(content, fg_color="transparent")
         footer.pack(fill="x")
 
-        # Marcar Todos
+        # Botón Marcar Todos
         btn_all = ctk.CTkButton(
             footer, text="Marcar Todos",
             font=ctk.CTkFont(family=FONT_FAMILY, size=11),
@@ -108,7 +123,7 @@ class MultiSelectModal(ctk.CTkToplevel):
         )
         btn_all.pack(side="left", padx=(0, 8))
 
-        # Desmarcar Todos
+        # Botón Desmarcar Todos
         btn_none = ctk.CTkButton(
             footer, text="Desmarcar Todos",
             font=ctk.CTkFont(family=FONT_FAMILY, size=11),
@@ -119,7 +134,7 @@ class MultiSelectModal(ctk.CTkToplevel):
         )
         btn_none.pack(side="left")
 
-        # Cancel button
+        # Botón Cancelar
         btn_cancel = ctk.CTkButton(
             footer, text="Cancelar",
             font=ctk.CTkFont(family=FONT_FAMILY, size=12),
@@ -129,7 +144,7 @@ class MultiSelectModal(ctk.CTkToplevel):
         )
         btn_cancel.pack(side="right", padx=(8, 0))
 
-        # Aceptar Button
+        # Botón Aceptar
         btn_ok = ctk.CTkButton(
             footer, text="Aceptar",
             font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
@@ -141,28 +156,32 @@ class MultiSelectModal(ctk.CTkToplevel):
         btn_ok.pack(side="right")
 
     def select_all(self):
+        """Marca todos los checkboxes activos."""
         for var in self.vars.values():
             var.set(True)
 
     def deselect_all(self):
+        """Desmarca todos los checkboxes activos."""
         for var in self.vars.values():
             var.set(False)
 
     def accept(self):
+        """Recupera la lista de categorías marcadas e invoca la función callback."""
         selected = [opt for opt, var in self.vars.items() if var.get()]
         self.callback(selected)
         self.destroy()
 
 
 def build_crq_page(container, master_window=None):
-    """Página CRQ con diseño premium y layout estable.
-
-    Cambios clave respecto a la versión anterior:
-    - Layout basado en pack (panel izq fijo, panel der expandible)
-      para evitar corrupción al cambiar contenido del progreso.
-    - Tarjetas con borde sutil y corner_radius premium.
-    - Progreso animado con interpolación suave.
-    - Timeline compacto con badges numerados.
+    """
+    Construye la página gráfica del módulo de Gestión de Cambios CRQ.
+    
+    Dibuja los controles de selección de fechas, filtros de categorías/torres,
+    e inicializa la línea de tiempo de progreso asíncrona de 5 pasos.
+    
+    Args:
+        container (ctk.CTkFrame): Contenedor donde se insertará el panel.
+        master_window (Tk/CTk): Ventana principal para anclar la modal flotante.
     """
 
     for w in container.winfo_children():
@@ -174,16 +193,15 @@ def build_crq_page(container, master_window=None):
     main_frame = ctk.CTkFrame(container, fg_color=BG_PRIMARY, corner_radius=0)
     main_frame.pack(fill="both", expand=True)
 
-    # ═══════════════════════════════════════════════════════
-    #  TWO-COLUMN LAYOUT  (pack-based = layout-stable)
-    #  Left: fixed width  |  Right: expands
-    # ═══════════════════════════════════════════════════════
+    # Layout estable de dos columnas (pack):
+    # Left: Ancho fijo para formularios.
+    # Right: Barra de progreso y timeline de pasos.
     left_panel = ctk.CTkFrame(
         main_frame, fg_color=BG_PRIMARY,
         width=LEFT_PANEL_WIDTH, corner_radius=0,
     )
     left_panel.pack(side="left", fill="y", padx=(24, 12), pady=24)
-    left_panel.pack_propagate(False)          # ← KEY: prevents resize
+    left_panel.pack_propagate(False)          # ← Previene el redimensionamiento del panel
 
     right_panel = ctk.CTkFrame(main_frame, fg_color=BG_PRIMARY, corner_radius=0)
     right_panel.pack(side="left", fill="both", expand=True, padx=(12, 24), pady=24)
@@ -231,6 +249,8 @@ def build_crq_page(container, master_window=None):
     )
 
     _de_kw = dict(
+        locale="es_ES",
+        cursor="hand2",
         background=ACCENT_INDIGO, foreground=TEXT_PRIMARY,
         headersbackground=BG_DEEPEST, headersforeground=TEXT_PRIMARY,
         selectbackground=ACCENT_INDIGO_HOVER, selectforeground=TEXT_PRIMARY,
@@ -690,32 +710,55 @@ def build_crq_page(container, master_window=None):
 
         def worker():
             try:
-                code = _run_impl(d_from, d_to, cat, torre)
-                logs = ""
+                code, logs_or_path = _run_impl(d_from, d_to, cat, torre)
             except Exception as exc:
-                code, logs = 99, str(exc)
-            container.after(0, lambda: _done(my_id, code, logs))
+                code, logs_or_path = 99, str(exc)
+            container.after(0, lambda: _done(my_id, code, logs_or_path))
 
-        def _done(mid, code, logs):
+        def _done(mid, code, logs_or_path):
             if mid != run_token["id"]:
                 return
             btn.configure(state="normal", fg_color=ACCENT_INDIGO)
             if code == 0:
-                status_lbl.configure(
-                    text="✓  Reporte generado correctamente.", text_color=SUCCESS,
+                from tkinter import filedialog
+                initial_name = f"Reporte_CRQ_{d_from}_a_{d_to}.xlsx"
+                output_file = filedialog.asksaveasfilename(
+                    title="Guardar archivo Excel final",
+                    defaultextension=".xlsx",
+                    filetypes=[("Archivos Excel", "*.xlsx")],
+                    initialfile=initial_name,
+                    initialdir=os.path.join(REPO_ROOT, "output"),
                 )
-                action_lbl.configure(text="Reporte generado exitosamente.")
+                if output_file:
+                    try:
+                        import shutil
+                        shutil.copy2(logs_or_path, output_file)
+                        status_lbl.configure(
+                            text="✓  Archivo guardado correctamente.", text_color=SUCCESS,
+                        )
+                        action_lbl.configure(text=f"Guardado en: {output_file}")
+                    except Exception as save_err:
+                        status_lbl.configure(
+                            text="✗  Error al guardar el archivo.", text_color=ERROR,
+                        )
+                        action_lbl.configure(text=f"Error al guardar: {save_err}")
+                        messagebox.showerror("Error al guardar", str(save_err))
+                else:
+                    status_lbl.configure(
+                        text="⚠  Guardado cancelado.", text_color=TEXT_MUTED,
+                    )
+                    action_lbl.configure(text="Guardado cancelado por el usuario.")
             else:
                 status_lbl.configure(
                     text="✗  Error al generar el reporte.", text_color=ERROR,
                 )
                 action_lbl.configure(
-                    text=f"Error: {logs.strip() or 'Revisa los detalles.'}",
+                    text=f"Error: {logs_or_path.strip() or 'Revisa los detalles.'}",
                 )
                 messagebox.showerror(
                     "Error en Reporte CRQ",
                     f"No se pudo generar el reporte.\n\n"
-                    f"Detalle:\n{logs.strip() or 'Código: ' + str(code)}",
+                    f"Detalle:\n{logs_or_path.strip() or 'Código: ' + str(code)}",
                 )
 
         threading.Thread(target=worker, daemon=True).start()

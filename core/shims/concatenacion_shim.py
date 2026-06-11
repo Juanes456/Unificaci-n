@@ -16,9 +16,14 @@ sys.path.insert(0, os.path.join(REPO_ROOT, "herramientas", "concatenacion"))
 
 
 def build_concatenacion_page(container):
-    """Página de Concatenación con diseño premium consistente.
-
-    Layout estable con pack (panel izq fijo, panel der expandible).
+    """
+    Construye la página gráfica del módulo de Concatenación y Filtrado.
+    
+    Dibuja los paneles de entrada de archivos, configuración del filtro de gestión,
+    el botón de procesamiento de datos y un widget de consola de texto para logs.
+    
+    Args:
+        container (ctk.CTkFrame): Contenedor donde se insertarán los elementos del panel.
     """
     for w in container.winfo_children():
         w.destroy()
@@ -29,7 +34,9 @@ def build_concatenacion_page(container):
     main_frame = ctk.CTkFrame(container, fg_color=BG_PRIMARY, corner_radius=0)
     main_frame.pack(fill="both", expand=True)
 
-    # Two-column layout (pack-based for stability)
+    # Layout de dos columnas para asegurar estabilidad visual al cambiar componentes:
+    # Panel Izquierdo: Ancho fijo para controles y parámetros.
+    # Panel Derecho: Se expande para alojar la consola de logs.
     left_panel = ctk.CTkFrame(
         main_frame, fg_color=BG_PRIMARY,
         width=LEFT_PANEL_WIDTH, corner_radius=0,
@@ -74,6 +81,15 @@ def build_concatenacion_page(container):
     f2_var = ctk.StringVar(value="")
 
     def _pick(var, idx, btn_ref, lbl_ref):
+        """
+        Abre el explorador de archivos para elegir un Excel de entrada.
+        
+        Args:
+            var (StringVar): Variable donde se guarda la ruta del archivo.
+            idx (int): Índice numérico del archivo (1 o 2).
+            btn_ref (CTkButton): Botón que dispara la acción para actualizar su color.
+            lbl_ref (CTkLabel): Etiqueta para reflejar el nombre del archivo.
+        """
         path = filedialog.askopenfilename(
             title=f"Seleccionar archivo {idx}",
             filetypes=[("Excel", "*.xlsx *.xls"), ("Todos", "*.*")],
@@ -189,7 +205,7 @@ def build_concatenacion_page(container):
     )
     console_card.pack(fill="both", expand=True)
 
-    # Console header bar
+    # Cabecera de la consola de comandos
     console_hdr = ctk.CTkFrame(console_card, fg_color=BORDER_SUBTLE, height=36, corner_radius=0)
     console_hdr.pack(fill="x", padx=1, pady=(1, 0))
     console_hdr.pack_propagate(False)
@@ -210,6 +226,7 @@ def build_concatenacion_page(container):
     txt.configure(state="disabled")
 
     def _append_log(s: str):
+        """Inserta líneas de texto en la consola y desplaza el scrollbar hacia abajo."""
         txt.configure(state="normal")
         txt.insert("end", s + "\n")
         txt.see("end")
@@ -222,6 +239,16 @@ def build_concatenacion_page(container):
     CONCAT_CONFIG = os.path.join(REPO_ROOT, "herramientas", "concatenacion", "config.json")
 
     def _run_headless(f1, f2):
+        """
+        Llama al pipeline lógico de concatenación usando la configuración en JSON.
+        
+        Args:
+            f1 (str): Ruta al archivo Excel 1.
+            f2 (str): Ruta al archivo Excel 2.
+            
+        Returns:
+            tuple[int, str]: Código de estado (0 éxito) y ruta temporal o mensaje de error.
+        """
         try:
             cfg = load_concatenacion_config(CONCAT_CONFIG)
             temp_output = os.path.join(REPO_ROOT, "output", "temp_result.xlsx")
@@ -237,6 +264,9 @@ def build_concatenacion_page(container):
             return 99, str(e)
 
     def on_run():
+        """
+        Valida entradas y lanza el procesamiento de archivos en un hilo separado.
+        """
         f1 = f1_var.get().strip()
         f2 = f2_var.get().strip()
         if not f1 or not f2:
@@ -260,6 +290,10 @@ def build_concatenacion_page(container):
             container.after(0, lambda: finalize(my_id, code, logs))
 
         def finalize(mid, code, logs):
+            """
+            Finaliza la ejecución del hilo, solicita la ruta final de guardado al usuario
+            y copia el archivo temporal al destino seleccionado.
+            """
             if mid != run_token["id"]:
                 return
             btn_run.configure(state="normal", fg_color=ACCENT_INDIGO)
@@ -267,7 +301,7 @@ def build_concatenacion_page(container):
             if code == 0:
                 _append_log("✓  Proceso de concatenación completado con éxito.")
                 
-                # Ahora sí, pedir al usuario dónde guardar
+                # Nombre sugerido por defecto
                 initial_name = (
                     f"Resultado {os.path.basename(f1)} & {os.path.basename(f2)}.xlsx"
                 )

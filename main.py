@@ -31,8 +31,20 @@ from core.shims.concatenacion_shim import build_concatenacion_page
 
 
 class UnificadaApp(ctk.CTk):
+    """
+    Clase principal que define la ventana de la Plataforma Unificada de TCS.
+    
+    Hereda de customtkinter.CTk y controla la barra lateral de navegación,
+    la carga dinámica de los paneles (shims) y el comportamiento general de la UI.
+    """
 
     def __init__(self):
+        """
+        Inicializa la ventana principal de la aplicación.
+        
+        Configura el tamaño, título, estados de maximizado, cuadrícula principal
+        e invoca la construcción de la barra lateral y el área de contenido.
+        """
         super().__init__()
         self.title("TCS — Plataforma Unificada")
         self.geometry("1200x800")
@@ -40,10 +52,12 @@ class UnificadaApp(ctk.CTk):
         self.resizable(True, True)
         self.configure(fg_color=BG_DEEPEST)
 
-        # ── Fullscreen maximized on launch ──
+        # ── Maximizado automático en el inicio (10ms de retraso para evitar fallos de render en Windows) ──
         self.after(10, lambda: self.state("zoomed"))
 
-        # Main grid: sidebar (col 0, fixed) + content (col 1, expands)
+        # Configuración del Grid principal:
+        # Columna 0 (barra lateral): Ancho fijo, sin expandir.
+        # Columna 1 (contenido): Se expande para ocupar todo el espacio restante.
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
@@ -51,16 +65,21 @@ class UnificadaApp(ctk.CTk):
         self._build_sidebar()
         self._build_content_area()
 
-        # Animation state
+        # Almacén de identificadores de callbacks de animación para cancelarlos en transiciones rápidas
         self._fade_ids = []
 
-        # Default page
+        # Cargar la página inicial (Gestión de Cambios CRQ) por defecto
         self.select_page("Cambios en produccion CRQ", self.show_crq)
 
     # ────────────────────────────────────────────────────────
     #  SIDEBAR
     # ────────────────────────────────────────────────────────
     def _build_sidebar(self):
+        """
+        Construye la barra lateral de navegación (sidebar) con sus respectivos widgets.
+        
+        Incluye el logo del proyecto, el badge de versión y los botones de navegación.
+        """
         self.sidebar = ctk.CTkFrame(
             self, width=SIDEBAR_WIDTH, corner_radius=0,
             fg_color=SIDEBAR_BG,
@@ -68,12 +87,12 @@ class UnificadaApp(ctk.CTk):
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_propagate(False)
 
-        # Thin right-edge separator
+        # Separador visual vertical muy delgado en el borde derecho de la barra lateral
         ctk.CTkFrame(
             self, width=1, corner_radius=0, fg_color=SIDEBAR_SEPARATOR
         ).grid(row=0, column=0, sticky="nse")
 
-        # ── Logo ──
+        # ── Bloque del logotipo ──
         logo_box = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         logo_box.pack(fill="x", padx=20, pady=(28, 4))
 
@@ -93,14 +112,14 @@ class UnificadaApp(ctk.CTk):
             text_color=TEXT_MUTED,
         ).pack(anchor="w", pady=(2, 0))
 
-        # ── Section header ──
+        # ── Encabezado de la sección ──
         ctk.CTkLabel(
             self.sidebar, text="HERRAMIENTAS",
             font=ctk.CTkFont(family=FONT_FAMILY, size=10, weight="bold"),
             text_color=TEXT_DISABLED, anchor="w",
         ).pack(fill="x", padx=24, pady=(28, 10))
 
-        # ── Navigation buttons ──
+        # ── Definición de botones de navegación ──
         self.nav_buttons = {}
         self.nav_indicators = {}
         nav_items = [
@@ -109,7 +128,7 @@ class UnificadaApp(ctk.CTk):
             ("Automatización", ">", self.show_automatizacion),
         ]
 
-        # Pack version badge first at the bottom so it sits nicely
+        # Agregar el pie de página de versión primero usando pack(side="bottom")
         ver_frame = ctk.CTkFrame(
             self.sidebar, fg_color=BG_CARD, corner_radius=BUTTON_RADIUS
         )
@@ -121,13 +140,13 @@ class UnificadaApp(ctk.CTk):
             text_color=TEXT_MUTED,
         ).pack(padx=12, pady=8)
 
-        # Pack navigation items tightly from top
+        # Construir y empaquetar secuencialmente cada botón de navegación en la barra lateral
         for idx, (name, icon, cmd) in enumerate(nav_items):
             row_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=40)
             row_frame.pack(fill="x", padx=8, pady=3)
             row_frame.pack_propagate(False)
 
-            # Active-state indicator bar (left edge)
+            # Indicador de estado activo (barra lateral de color acentuado)
             indicator = ctk.CTkFrame(
                 row_frame, width=3, height=24, corner_radius=2, fg_color="transparent"
             )
@@ -153,6 +172,9 @@ class UnificadaApp(ctk.CTk):
     #  CONTENT AREA
     # ────────────────────────────────────────────────────────
     def _build_content_area(self):
+        """
+        Dibuja el área de contenedor principal donde se incrustan las vistas de las herramientas.
+        """
         self.page_container = ctk.CTkFrame(
             self, corner_radius=0, fg_color=BG_PRIMARY
         )
@@ -164,6 +186,13 @@ class UnificadaApp(ctk.CTk):
     #  PAGE NAVIGATION
     # ────────────────────────────────────────────────────────
     def select_page(self, name, command):
+        """
+        Controla el cambio de vista, actualizando los estilos de los botones de la barra lateral.
+        
+        Args:
+            name (str): Nombre de la herramienta seleccionada.
+            command (callable): Función a invocar para renderizar la pantalla seleccionada.
+        """
         for btn_name, btn in self.nav_buttons.items():
             ind = self.nav_indicators[btn_name]
             if btn_name == name:
@@ -185,7 +214,11 @@ class UnificadaApp(ctk.CTk):
         self._fade_in_page()
 
     def _fade_in_page(self):
-        """Subtle page-transition flash."""
+        """
+        Ejecuta un efecto visual de transición ("flash") al cargar páginas.
+        
+        Alterna brevemente el color de fondo para dar retroalimentación visual al usuario.
+        """
         for aid in self._fade_ids:
             try:
                 self.after_cancel(aid)
@@ -198,11 +231,15 @@ class UnificadaApp(ctk.CTk):
         )
 
     def clear_page(self):
+        """
+        Destruye todos los widgets activos dentro de la zona de despliegue principal.
+        """
         for w in self.page_container.winfo_children():
             w.destroy()
 
-    # ── Page builders ──
+    # ── Métodos para invocar los constructores de pantallas de los shims ──
     def show_crq(self):
+        """Limpia el área principal e inicializa el panel de Gestión de Cambios CRQ."""
         self.clear_page()
         build_crq_page(self.page_container, master_window=self)
 
